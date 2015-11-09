@@ -1,0 +1,34 @@
+// WMPRemote.idl : IDL source for WMPRemote
+//
+
+// This file will be processed by the MIDL tool to
+// produce the type library (WMPRemote.tlb) and marshalling code.
+
+import "oaidl.idl";
+import "ocidl.idl";
+
+[
+	object,
+	uuid(295FFA2F-C0D4-490D-A805-B09DEB9B1FFC),
+	dual,
+	nonextensible,
+	pointer_default(unique)
+]
+interface IRemoteHost : IDispatch{
+};
+[
+	uuid(6861D738-5119-465B-BF11-1F294D5E0A61),
+	version(1.0),
+]
+library WMPRemoteLib
+{
+	importlib("stdole2.tlb");
+	[
+		uuid(E887A880-C8E6-4835-B0D2-60A06018FD70)		
+	]
+	coclass RemoteHost
+	{
+		[default] interface IRemoteHost;
+	};
+};
+

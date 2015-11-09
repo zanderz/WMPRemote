@@ -1,0 +1,16 @@
+HKCR
+{
+	NoRemove CLSID
+	{
+		ForceRemove {E887A880-C8E6-4835-B0D2-60A06018FD70} = s 'RemoteHost Class'
+		{
+			ForceRemove Programmable
+			LocalServer32 = s '%MODULE%'
+			{
+				val ServerExecutable = s '%MODULE_RAW%'
+			}
+			TypeLib = s '{6861D738-5119-465B-BF11-1F294D5E0A61}'
+			Version = s '1.0'
+		}
+	}
+}
