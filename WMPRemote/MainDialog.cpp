@@ -25,6 +25,9 @@ LRESULT CMainDialog::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL&
 	RECT                        rectWMP = { 0, 0, 0, 0 };
 	HRESULT                     hr;
 	CComBSTR listText;
+	
+	HICON hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON_DJOG));
+	SetIcon(hIcon);
 
 	// Get an simple container to contain WMP OCX
 	AtlAxWinInit();
@@ -119,6 +122,7 @@ LRESULT CMainDialog::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL&
 		pRemoteHost->Release();
 	}
 
+	SetTimer(IDT_SECOND_TIMER, 1000, NULL);
 
 
 	bHandled = TRUE;
@@ -135,6 +139,9 @@ LRESULT CMainDialog::OnTimer(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHan
 		SetPlayList();
 		KillTimer(IDT_TIMER1);
 		return 0;
+	}
+	else if (wParam == IDT_SECOND_TIMER){
+		CheckCountdown();
 	}
 	return 1;
 }
@@ -167,6 +174,9 @@ void CMainDialog::SetPlayList()
 			if (pCurrentItem == NULL && i == 0)
 				pCurrentItem = pItem;
 
+			long lAttributeCount = 0;
+			CComBSTR attributeName, attributeVal;
+
 			// Skip the items in the playlist till we get to ours
 			if (lDisplayed == 0) {
 				VARIANT_BOOL bSame = VARIANT_FALSE;
@@ -175,8 +185,6 @@ void CMainDialog::SetPlayList()
 					continue;
 			}
 
-			long lAttributeCount = 0;
-			CComBSTR attributeName, attributeVal;
 			if (FAILED(pItem->get_attributeCount(&lAttributeCount)))
 				continue;
 			//for (int j = 0; j < lAttributeCount; j++)
@@ -201,6 +209,7 @@ void CMainDialog::SetPlayList()
 			lDisplayed++;
 		}
 	}
+	songList.MakeUpper();
 	SetDlgItemText(IDC_EDIT1, songList);
 	GetDlgItem(IDC_EDIT1).HideCaret();
 }
@@ -235,13 +244,25 @@ void CMainDialog::AdjustTextSize() {
 	SendMessage(h, WM_SETFONT, WPARAM(hFont), TRUE);
 	::HideCaret(h);
 	DeleteObject(hOldFont);
+
+	h = GetDlgItem(IDC_COUNTDOWN);
+	hOldFont = (HFONT)SendMessage(h, WM_GETFONT, 0, 0);
+	SendMessage(h, WM_SETFONT, WPARAM(hFont), TRUE);
+	::HideCaret(h);
+	DeleteObject(hOldFont);
 }
 
 LRESULT CMainDialog::OnCtlColorStatic(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled){
 
-	if ((HWND)lParam == (HWND)GetDlgItem( IDC_EDIT1))
+	if ((HWND)lParam == (HWND)GetDlgItem(IDC_EDIT1))
 	{
 		SetTextColor((HDC)wParam, RGB(0, 0, 0));
+		SetBkColor((HDC)wParam, RGB(255, 255, 255));
+		::HideCaret((HWND)lParam);
+	}
+	else if ((HWND)lParam == (HWND)GetDlgItem(IDC_COUNTDOWN))
+	{
+		SetTextColor((HDC)wParam, RGB(255, 0, 0));
 		SetBkColor((HDC)wParam, RGB(255, 255, 255));
 		::HideCaret((HWND)lParam);
 	}
@@ -252,6 +273,39 @@ LRESULT CMainDialog::OnWindowPosChanged(UINT uMsg, WPARAM wParam, LPARAM lParam,
 	RECT r;
 	GetClientRect(&r);
 	GetDlgItem(IDC_EDIT1).MoveWindow(&r, false);
+	int lineHeight = (r.bottom - r.top) / 3;
+	r.bottom = r.top + lineHeight;
+	r.left = r.right - (lineHeight * 4) / 3;
+	GetDlgItem(IDC_COUNTDOWN).MoveWindow(&r, false);
 	AdjustTextSize();
 	return 1;
+}
+
+void CMainDialog::CheckCountdown() {
+	CString text;
+	CComPtr<IWMPCore> pCore;
+	CComPtr<IWMPControls> pControl;
+	CComPtr<IWMPMedia> pCurrentItem;
+
+	if (SUCCEEDED(m_spPlayer->QueryInterface(&pCore))){
+		if (SUCCEEDED(pCore->get_controls(&pControl))){
+			if (SUCCEEDED(pControl->get_currentItem(&pCurrentItem))) {
+				double currentPosition = 0;
+				double duration = 0;
+				double timeLeft = 0;
+				if (SUCCEEDED(pControl->get_currentPosition(&currentPosition)) &&
+					SUCCEEDED(pCurrentItem->get_duration(&duration))) {
+					timeLeft = duration - currentPosition;
+					if (timeLeft <= 60)
+						text.Format(L"%d", (int)timeLeft);
+				}
+			}
+		}
+	}
+	if (text.GetLength() == 0)
+		GetDlgItem(IDC_COUNTDOWN).ShowWindow(SW_HIDE);
+	else {
+		SetDlgItemText(IDC_COUNTDOWN, text);
+		GetDlgItem(IDC_COUNTDOWN).ShowWindow(SW_SHOW);
+	}
 }

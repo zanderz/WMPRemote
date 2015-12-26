@@ -8,6 +8,7 @@
 #include "wmp.h"
 
 #define IDT_TIMER1	111
+#define IDT_SECOND_TIMER	112
 
 using namespace ATL;
 
@@ -249,6 +250,7 @@ END_MSG_MAP()
 		/* [in] */ long fX,
 		/* [in] */ long fY){}
 	void SetPlayList();
+	void CheckCountdown();
 
 	void AdjustTextSize();
 protected:
