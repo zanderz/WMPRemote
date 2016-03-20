@@ -8,7 +8,9 @@
 #include "wmp.h"
 
 #define IDT_TIMER1	111
-#define IDT_SECOND_TIMER	112
+#define IDT_SECOND_TIMER 	112
+#define TRANSITION_DELAY_SECS 10
+#define INPUT_TICKS_THRESHOLD 3000
 
 using namespace ATL;
 
@@ -19,7 +21,7 @@ class CMainDialog :
 	public IWMPEvents
 {
 public:
-	CMainDialog() :m_dwAdviseCookie(0), m_dwRef(0)
+	CMainDialog() :m_dwAdviseCookie(0), m_dwRef(0), m_transitionTime(0), m_dwLastInputTicks(0)
 	{
 	}
 
@@ -83,14 +85,20 @@ END_MSG_MAP()
 	CComPtr<IWMPPlayer4>            m_spPlayer;             // Player
 	CComPtr<IConnectionPoint>   m_spConnectionPoint;
 	DWORD                       m_dwAdviseCookie;
-
+	int							m_transitionTime;
+	DWORD						m_dwLastInputTicks;
 
 
 	void STDMETHODCALLTYPE OpenStateChange(
 		/* [in] */ long NewState){}
 
 	void STDMETHODCALLTYPE PlayStateChange(
-		/* [in] */ long NewState){}
+		/* [in] */ long NewState){
+		if (NewState == wmppsTransitioning && CheckNoRecentInput()){
+			m_transitionTime = TRANSITION_DELAY_SECS;
+			PostMessage(WM_TIMER, IDT_SECOND_TIMER);
+		}
+	}
 
 	void STDMETHODCALLTYPE AudioLanguageChange(
 		/* [in] */ long LangID){}
@@ -213,20 +221,26 @@ END_MSG_MAP()
 		/* [in] */ short nButton,
 		/* [in] */ short nShiftState,
 		/* [in] */ long fX,
-		/* [in] */ long fY){}
+		/* [in] */ long fY){
+		m_dwLastInputTicks = GetTickCount();
+	}
 
 	void STDMETHODCALLTYPE DoubleClick(
 		/* [in] */ short nButton,
 		/* [in] */ short nShiftState,
 		/* [in] */ long fX,
-		/* [in] */ long fY){}
+		/* [in] */ long fY){
+		m_dwLastInputTicks = GetTickCount();
+	}
 
 	void STDMETHODCALLTYPE KeyDown(
 		/* [in] */ short nKeyCode,
 		/* [in] */ short nShiftState){}
 
 	void STDMETHODCALLTYPE KeyPress(
-		/* [in] */ short nKeyAscii){}
+		/* [in] */ short nKeyAscii){
+		m_dwLastInputTicks = GetTickCount();
+	}
 
 	void STDMETHODCALLTYPE KeyUp(
 		/* [in] */ short nKeyCode,
@@ -236,7 +250,9 @@ END_MSG_MAP()
 		/* [in] */ short nButton,
 		/* [in] */ short nShiftState,
 		/* [in] */ long fX,
-		/* [in] */ long fY){}
+		/* [in] */ long fY){
+		m_dwLastInputTicks = GetTickCount();
+	}
 
 	void STDMETHODCALLTYPE MouseMove(
 		/* [in] */ short nButton,
@@ -248,11 +264,17 @@ END_MSG_MAP()
 		/* [in] */ short nButton,
 		/* [in] */ short nShiftState,
 		/* [in] */ long fX,
-		/* [in] */ long fY){}
+		/* [in] */ long fY){
+		m_dwLastInputTicks = GetTickCount();
+	}
+	
 	void SetPlayList();
 	void CheckCountdown();
 
 	void AdjustTextSize();
+	bool CheckNoRecentInput(){
+		return (GetTickCount() - m_dwLastInputTicks) > INPUT_TICKS_THRESHOLD;
+	}
 protected:
 	ULONG m_dwRef;
 

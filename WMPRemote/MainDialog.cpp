@@ -262,7 +262,10 @@ LRESULT CMainDialog::OnCtlColorStatic(UINT uMsg, WPARAM wParam, LPARAM lParam, B
 	}
 	else if ((HWND)lParam == (HWND)GetDlgItem(IDC_COUNTDOWN))
 	{
-		SetTextColor((HDC)wParam, RGB(255, 0, 0));
+		if (m_transitionTime > 0)
+			SetTextColor((HDC)wParam, RGB(0, 0, 255));
+		else
+			SetTextColor((HDC)wParam, RGB(255, 0, 0));
 		SetBkColor((HDC)wParam, RGB(255, 255, 255));
 		::HideCaret((HWND)lParam);
 	}
@@ -289,15 +292,30 @@ void CMainDialog::CheckCountdown() {
 
 	if (SUCCEEDED(m_spPlayer->QueryInterface(&pCore))){
 		if (SUCCEEDED(pCore->get_controls(&pControl))){
-			if (SUCCEEDED(pControl->get_currentItem(&pCurrentItem))) {
+			if (m_transitionTime == TRANSITION_DELAY_SECS){
+				// Start of transition delay
+				pControl->stop();
+			}
+			if (m_transitionTime > 0){
+				if (m_transitionTime == 1){
+					// End of transition delay
+					pControl->play();
+				}
+				else {
+					text.Format(L"%d", (int)m_transitionTime);
+				}
+				m_transitionTime--;
+			}
+			else if (SUCCEEDED(pControl->get_currentItem(&pCurrentItem))) {
 				double currentPosition = 0;
 				double duration = 0;
 				double timeLeft = 0;
-				if (SUCCEEDED(pControl->get_currentPosition(&currentPosition)) &&
+				if (pControl && pCurrentItem &&
+					SUCCEEDED(pControl->get_currentPosition(&currentPosition)) &&
 					SUCCEEDED(pCurrentItem->get_duration(&duration))) {
 					timeLeft = duration - currentPosition;
-					if (timeLeft <= 60)
-						text.Format(L"%d", (int)timeLeft);
+					if (timeLeft <= 50)
+						text.Format(L"%d", (int)timeLeft + TRANSITION_DELAY_SECS);
 				}
 			}
 		}
