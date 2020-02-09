@@ -148,6 +148,7 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="DJOG.ico" />
+    <Image Include="Icons8-Ios7-Music-Dj.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

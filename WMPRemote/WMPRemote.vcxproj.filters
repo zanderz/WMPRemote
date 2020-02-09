@@ -80,5 +80,8 @@
     <Image Include="DJOG.ico">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="Icons8-Ios7-Music-Dj.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>
