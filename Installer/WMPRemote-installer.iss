@@ -22,7 +22,7 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={pf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputBaseFilename={#MyAppName}-setup
-SetupIconFile=C:\Users\Steve\work\WMPRemote\WMPRemote\Icons8-Ios7-Music-Dj.ico
+SetupIconFile={#SourcePath}\..\WMPRemote\Icons8-Ios7-Music-Dj.ico
 Compression=lzma
 SolidCompression=yes
 
@@ -34,8 +34,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked; OnlyBelowVersion: 0,6.1
 
 [Files]
-Source: "..\Redist\VC_redist.x86.exe"; DestDir: "{tmp}"
-Source: "C:\Users\Steve\work\WMPRemote\Release\WMPRemote.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#GetEnv('VCToolsRedistDir')}\VC_redist.x86.exe"; DestDir: "{tmp}"
+Source: "{#SourcePath}\..\Release\WMPRemote.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
