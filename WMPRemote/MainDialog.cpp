@@ -207,6 +207,9 @@ void CMainDialog::SetPlayList()
 			if (lDisplayed < 2)
 				songList += L"\r\n";
 			lDisplayed++;
+			CString out;
+			out.Format(L"SetPlayList: item %d\n", i);
+			OutputDebugString(out);
 		}
 	}
 	songList.MakeUpper();
@@ -250,6 +253,18 @@ void CMainDialog::AdjustTextSize() {
 	SendMessage(h, WM_SETFONT, WPARAM(hFont), TRUE);
 	::HideCaret(h);
 	DeleteObject(hOldFont);
+
+	CString timerText;
+	UINT textLen = GetDlgItemText(IDC_COUNTDOWN, timerText.GetBufferSetLength(40), 40);
+	GetClientRect(&r);
+	int lineHeight = (r.bottom - r.top) / 3;
+	r.bottom = r.top + lineHeight;
+	// Getting the real width of the countdown text never really worked out,
+	// so we just hack it here
+	r.left = r.right - (lineHeight * 4) / 3;
+	if (textLen > 2)
+		r.left -= lineHeight;
+	GetDlgItem(IDC_COUNTDOWN).MoveWindow(&r, false);
 }
 
 LRESULT CMainDialog::OnCtlColorStatic(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled){
@@ -276,10 +291,6 @@ LRESULT CMainDialog::OnWindowPosChanged(UINT uMsg, WPARAM wParam, LPARAM lParam,
 	RECT r;
 	GetClientRect(&r);
 	GetDlgItem(IDC_EDIT1).MoveWindow(&r, false);
-	int lineHeight = (r.bottom - r.top) / 3;
-	r.bottom = r.top + lineHeight;
-	r.left = r.right - (lineHeight * 4) / 3;
-	GetDlgItem(IDC_COUNTDOWN).MoveWindow(&r, false);
 	AdjustTextSize();
 	return 1;
 }
@@ -294,14 +305,19 @@ void CMainDialog::CheckCountdown() {
 		if (SUCCEEDED(pCore->get_controls(&pControl))){
 			if (m_transitionTime == TRANSITION_DELAY_SECS){
 				// Start of transition delay
+				OutputDebugString(L"CheckCountdown: Start of transition delay\n");
 				pControl->stop();
 			}
 			if (m_transitionTime > 0){
 				if (m_transitionTime == 1){
 					// End of transition delay
+					OutputDebugString(L"CheckCountdown: End of transition delay\n");
 					pControl->play();
 				}
 				else {
+					CString out;
+					out.Format(L"CheckCountdown: transitioning %d\n", m_transitionTime);
+					OutputDebugString(out);
 					text.Format(L"%d", (int)m_transitionTime);
 				}
 				m_transitionTime--;
@@ -309,13 +325,16 @@ void CMainDialog::CheckCountdown() {
 			else if (SUCCEEDED(pControl->get_currentItem(&pCurrentItem))) {
 				double currentPosition = 0;
 				double duration = 0;
-				double timeLeft = 0;
 				if (pControl && pCurrentItem &&
 					SUCCEEDED(pControl->get_currentPosition(&currentPosition)) &&
 					SUCCEEDED(pCurrentItem->get_duration(&duration))) {
-					timeLeft = duration - currentPosition;
-					if (timeLeft <= 50)
-						text.Format(L"%d", (int)timeLeft + TRANSITION_DELAY_SECS);
+
+					CString minutes;
+					m_timeLeft = (duration - currentPosition);
+					if (m_timeLeft >= 60)
+						minutes.Format(L"%d:", (int)m_timeLeft / 60);
+					text.Format(L"%s%02d", minutes.GetBuffer(), (int)m_timeLeft % 60);
+					OutputDebugString(CString(L"CheckCountdown: ") + text + L"\n");
 				}
 			}
 		}
@@ -323,7 +342,11 @@ void CMainDialog::CheckCountdown() {
 	if (text.GetLength() == 0)
 		GetDlgItem(IDC_COUNTDOWN).ShowWindow(SW_HIDE);
 	else {
+		CString timerText;
+		UINT textLen = GetDlgItemText(IDC_COUNTDOWN, timerText.GetBufferSetLength(40), 40);
 		SetDlgItemText(IDC_COUNTDOWN, text);
+		if (text.GetLength() != textLen)
+			AdjustTextSize();
 		GetDlgItem(IDC_COUNTDOWN).ShowWindow(SW_SHOW);
 	}
 }

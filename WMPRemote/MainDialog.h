@@ -21,7 +21,7 @@ class CMainDialog :
 	public IWMPEvents
 {
 public:
-	CMainDialog() :m_dwAdviseCookie(0), m_dwRef(0), m_transitionTime(0), m_dwLastInputTicks(0)
+	CMainDialog() :m_dwAdviseCookie(0), m_dwRef(0), m_transitionTime(0), m_timeLeft(0)
 	{
 	}
 
@@ -86,30 +86,51 @@ END_MSG_MAP()
 	CComPtr<IConnectionPoint>   m_spConnectionPoint;
 	DWORD                       m_dwAdviseCookie;
 	int							m_transitionTime;
-	DWORD						m_dwLastInputTicks;
+	double						m_timeLeft;
+	BOOL						m_doDelay = FALSE;
 
 
 	void STDMETHODCALLTYPE OpenStateChange(
-		/* [in] */ long NewState){}
+		/* [in] */ long NewState){
+		OutputDebugString(L"OpenStateChange\n");
+	}
 
 	void STDMETHODCALLTYPE PlayStateChange(
 		/* [in] */ long NewState){
-		if (NewState == wmppsTransitioning && CheckNoRecentInput()){
-			m_transitionTime = TRANSITION_DELAY_SECS;
-			PostMessage(WM_TIMER, IDT_SECOND_TIMER);
+		CString out;
+		out.Format(L"PlayStateChange %d\n", NewState);
+		OutputDebugString(out);
+		switch (NewState) {
+		case wmppsMediaEnded:
+			m_doDelay = TRUE;
+			break;
+		case wmppsPlaying:
+			if (m_doDelay) {
+				m_doDelay = FALSE;
+				m_transitionTime = TRANSITION_DELAY_SECS;
+				PostMessage(WM_TIMER, IDT_SECOND_TIMER);
+			}
+			break;
+		case wmppsReady:
+			m_doDelay = FALSE;
+			break;
 		}
 	}
 
 	void STDMETHODCALLTYPE AudioLanguageChange(
 		/* [in] */ long LangID){}
 
-	void STDMETHODCALLTYPE StatusChange(void){}
+	void STDMETHODCALLTYPE StatusChange(void){
+		OutputDebugString(L"StatusChange\n");
+	}
 
 	void STDMETHODCALLTYPE ScriptCommand(
 		/* [in] */ BSTR scType,
 		/* [in] */ BSTR Param){}
 
-	void STDMETHODCALLTYPE NewStream(void){}
+	void STDMETHODCALLTYPE NewStream(void){
+		OutputDebugString(L"NewStream\n");
+	}
 
 	void STDMETHODCALLTYPE Disconnect(
 		/* [in] */ long Result){}
@@ -129,7 +150,9 @@ END_MSG_MAP()
 
 	void STDMETHODCALLTYPE PositionChange(
 		/* [in] */ double oldPosition,
-		/* [in] */ double newPosition){}
+		/* [in] */ double newPosition){
+		OutputDebugString(L"PositionChange\n");
+	}
 
 	void STDMETHODCALLTYPE MarkerHit(
 		/* [in] */ long MarkerNum){}
@@ -143,32 +166,43 @@ END_MSG_MAP()
 	void STDMETHODCALLTYPE PlaylistChange(
 		/* [in] */ IDispatch *Playlist,
 		/* [in] */ WMPPlaylistChangeEventType change){
+		CString out;
+		out.Format(L"PlaylistChange %d\n", change);
+		OutputDebugString(out);
 		RefreshPlayList();
 	}
 
 	void STDMETHODCALLTYPE CurrentPlaylistChange(
 		/* [in] */ WMPPlaylistChangeEventType change){
+		CString out;
+		out.Format(L"PlaylistChange %d\n", change);
+		OutputDebugString(out);
 		RefreshPlayList();
 		}
 
 	void STDMETHODCALLTYPE CurrentPlaylistItemAvailable(
-		/* [in] */ BSTR bstrItemName){}
+		/* [in] */ BSTR bstrItemName){
+		OutputDebugString(L"CurrentPlaylistItemAvailable\n");
+	}
 
 	void STDMETHODCALLTYPE MediaChange(
 		/* [in] */ IDispatch *Item){
-		int i = 0;
+		OutputDebugString(L"MediaChange\n");
 	}
 
 	void STDMETHODCALLTYPE CurrentMediaItemAvailable(
-		/* [in] */ BSTR bstrItemName){}
+		/* [in] */ BSTR bstrItemName){
+		OutputDebugString(L"CurrentMediaItemAvailable\n");
+	}
 
 	void STDMETHODCALLTYPE CurrentItemChange(
 		/* [in] */ IDispatch *pdispMedia){
+		OutputDebugString(L"CurrentItemChange\n");
 		RefreshPlayList();
 	}
 
 	void STDMETHODCALLTYPE MediaCollectionChange(void){
-		int i = 0;
+		OutputDebugString(L"MediaCollectionChange\n");
 	}
 
 	void STDMETHODCALLTYPE MediaCollectionAttributeStringAdded(
@@ -198,13 +232,17 @@ END_MSG_MAP()
 
 	void STDMETHODCALLTYPE ModeChange(
 		/* [in] */ BSTR ModeName,
-		/* [in] */ VARIANT_BOOL NewValue){}
+		/* [in] */ VARIANT_BOOL NewValue){
+		OutputDebugString(L"ModeChange\n");
+	}
 
 	void STDMETHODCALLTYPE MediaError(
 		/* [in] */ IDispatch *pMediaObject){}
 
 	void STDMETHODCALLTYPE OpenPlaylistSwitch(
-		/* [in] */ IDispatch *pItem){}
+		/* [in] */ IDispatch *pItem){
+		OutputDebugString(L"OpenPlaylistSwitch\n");
+	}
 
 	void STDMETHODCALLTYPE DomainChange(
 		/* [in] */ BSTR strDomain){}
@@ -221,26 +259,20 @@ END_MSG_MAP()
 		/* [in] */ short nButton,
 		/* [in] */ short nShiftState,
 		/* [in] */ long fX,
-		/* [in] */ long fY){
-		m_dwLastInputTicks = GetTickCount();
-	}
+		/* [in] */ long fY){}
 
 	void STDMETHODCALLTYPE DoubleClick(
 		/* [in] */ short nButton,
 		/* [in] */ short nShiftState,
 		/* [in] */ long fX,
-		/* [in] */ long fY){
-		m_dwLastInputTicks = GetTickCount();
-	}
+		/* [in] */ long fY){}
 
 	void STDMETHODCALLTYPE KeyDown(
 		/* [in] */ short nKeyCode,
 		/* [in] */ short nShiftState){}
 
 	void STDMETHODCALLTYPE KeyPress(
-		/* [in] */ short nKeyAscii){
-		m_dwLastInputTicks = GetTickCount();
-	}
+		/* [in] */ short nKeyAscii){}
 
 	void STDMETHODCALLTYPE KeyUp(
 		/* [in] */ short nKeyCode,
@@ -250,9 +282,7 @@ END_MSG_MAP()
 		/* [in] */ short nButton,
 		/* [in] */ short nShiftState,
 		/* [in] */ long fX,
-		/* [in] */ long fY){
-		m_dwLastInputTicks = GetTickCount();
-	}
+		/* [in] */ long fY){}
 
 	void STDMETHODCALLTYPE MouseMove(
 		/* [in] */ short nButton,
@@ -264,17 +294,12 @@ END_MSG_MAP()
 		/* [in] */ short nButton,
 		/* [in] */ short nShiftState,
 		/* [in] */ long fX,
-		/* [in] */ long fY){
-		m_dwLastInputTicks = GetTickCount();
-	}
+		/* [in] */ long fY){}
 	
 	void SetPlayList();
 	void CheckCountdown();
 
 	void AdjustTextSize();
-	bool CheckNoRecentInput(){
-		return (GetTickCount() - m_dwLastInputTicks) > INPUT_TICKS_THRESHOLD;
-	}
 protected:
 	ULONG m_dwRef;
 
