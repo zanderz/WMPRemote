@@ -10,7 +10,13 @@
 #define IDT_TIMER1	111
 #define IDT_SECOND_TIMER 	112
 #define TRANSITION_DELAY_SECS 10
-#define INPUT_TICKS_THRESHOLD 3000
+#define FADEOUT_SECS 5				// cut off track by lowering the volume over this period
+#define FORCED_TRUNCATE 180
+
+#define WM_COUNTDOWNSTART	WM_USER+100
+#define WM_COUNTDOWNEND		WM_USER+101
+
+#define IDM_SYSCOMMAND_SETTINGS		0xE000
 
 using namespace ATL;
 
@@ -21,7 +27,13 @@ class CMainDialog :
 	public IWMPEvents
 {
 public:
-	CMainDialog() :m_dwAdviseCookie(0), m_dwRef(0), m_transitionTime(0), m_timeLeft(0)
+	CMainDialog()
+		:m_dwAdviseCookie(0)
+		, m_dwRef(0)
+		, m_transitionTime(0)
+		, m_volume(0)
+		, m_countdownSetting(TRANSITION_DELAY_SECS)
+		, m_fadeoutSetting(FORCED_TRUNCATE)
 	{
 	}
 
@@ -54,6 +66,9 @@ BEGIN_MSG_MAP(CMainDialog)
 	MESSAGE_HANDLER(WM_TIMER, OnTimer)
 	MESSAGE_HANDLER(WM_CTLCOLORSTATIC, OnCtlColorStatic)
 	MESSAGE_HANDLER(WM_WINDOWPOSCHANGED, OnWindowPosChanged)
+	MESSAGE_HANDLER(WM_COUNTDOWNSTART, OnCountdownStart)
+	MESSAGE_HANDLER(WM_COUNTDOWNEND, OnCountdownEnd)
+	MESSAGE_HANDLER(WM_SYSCOMMAND, OnSysCommand)
 	COMMAND_HANDLER(IDOK, BN_CLICKED, OnClickedOK)
 	COMMAND_HANDLER(IDCANCEL, BN_CLICKED, OnClickedCancel)
 	CHAIN_MSG_MAP(CAxDialogImpl<CMainDialog>)
@@ -68,6 +83,9 @@ END_MSG_MAP()
 	LRESULT OnTimer(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	LRESULT OnCtlColorStatic(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	LRESULT OnWindowPosChanged(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
+	LRESULT OnCountdownStart(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
+	LRESULT OnCountdownEnd(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
+	LRESULT OnSysCommand(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	
 	void RefreshPlayList();
 	LRESULT OnClickedOK(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled)
@@ -86,8 +104,10 @@ END_MSG_MAP()
 	CComPtr<IConnectionPoint>   m_spConnectionPoint;
 	DWORD                       m_dwAdviseCookie;
 	int							m_transitionTime;
-	double						m_timeLeft;
 	BOOL						m_doDelay = FALSE;
+	long						m_volume;
+	DWORD						m_countdownSetting;
+	DWORD						m_fadeoutSetting;
 
 
 	void STDMETHODCALLTYPE OpenStateChange(
@@ -95,27 +115,7 @@ END_MSG_MAP()
 		OutputDebugString(L"OpenStateChange\n");
 	}
 
-	void STDMETHODCALLTYPE PlayStateChange(
-		/* [in] */ long NewState){
-		CString out;
-		out.Format(L"PlayStateChange %d\n", NewState);
-		OutputDebugString(out);
-		switch (NewState) {
-		case wmppsMediaEnded:
-			m_doDelay = TRUE;
-			break;
-		case wmppsPlaying:
-			if (m_doDelay) {
-				m_doDelay = FALSE;
-				m_transitionTime = TRANSITION_DELAY_SECS;
-				PostMessage(WM_TIMER, IDT_SECOND_TIMER);
-			}
-			break;
-		case wmppsReady:
-			m_doDelay = FALSE;
-			break;
-		}
-	}
+	void STDMETHODCALLTYPE PlayStateChange(/* [in] */ long NewState);
 
 	void STDMETHODCALLTYPE AudioLanguageChange(
 		/* [in] */ long LangID){}
@@ -185,10 +185,7 @@ END_MSG_MAP()
 		OutputDebugString(L"CurrentPlaylistItemAvailable\n");
 	}
 
-	void STDMETHODCALLTYPE MediaChange(
-		/* [in] */ IDispatch *Item){
-		OutputDebugString(L"MediaChange\n");
-	}
+	void STDMETHODCALLTYPE MediaChange(/* [in] */ IDispatch* Item);
 
 	void STDMETHODCALLTYPE CurrentMediaItemAvailable(
 		/* [in] */ BSTR bstrItemName){

@@ -3,6 +3,7 @@
 #include "stdafx.h"
 #include "MainDialog.h"
 #include "RemoteHost.h"
+#include "SettingsDialog.h"
 
 
 // {A4879BCD-FCC1-47EF-91FA-B70C94795ABF}
@@ -122,6 +123,9 @@ LRESULT CMainDialog::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL&
 		pRemoteHost->Release();
 	}
 
+	HMENU hMenu = GetSystemMenu(FALSE);
+	AppendMenu(hMenu, MF_ENABLED | MF_STRING, IDM_SYSCOMMAND_SETTINGS, L"Settings");
+	
 	SetTimer(IDT_SECOND_TIMER, 1000, NULL);
 
 
@@ -157,9 +161,12 @@ void CMainDialog::SetPlayList()
 	CComPtr<IWMPControls> pControl;
 	CComPtr<IWMPMedia> pCurrentItem;
 
-	if (SUCCEEDED(m_spPlayer->QueryInterface(&pCore))){
-		if (SUCCEEDED(pCore->get_controls(&pControl)))
+	if (SUCCEEDED(m_spPlayer->QueryInterface(&pCore)) &&
+		SUCCEEDED(pCore->get_controls(&pControl))) {
 			pControl->get_currentItem(&pCurrentItem);
+	}
+	else {
+		return;
 	}
 
 	if (SUCCEEDED(m_spPlayer->get_currentPlaylist(&pPl)))
@@ -295,23 +302,100 @@ LRESULT CMainDialog::OnWindowPosChanged(UINT uMsg, WPARAM wParam, LPARAM lParam,
 	return 1;
 }
 
+LRESULT CMainDialog::OnCountdownStart(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled) {
+	CComPtr<IWMPCore> pCore;
+	CComPtr<IWMPControls> pControl;
+
+	if (SUCCEEDED(m_spPlayer->QueryInterface(&pCore))) {
+		if (SUCCEEDED(pCore->get_controls(&pControl))) {
+			pControl->stop();
+		}
+	}
+	return 1;
+}
+
+LRESULT CMainDialog::OnCountdownEnd(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled) {
+	CComPtr<IWMPCore> pCore;
+	CComPtr<IWMPSettings> pSettings;
+	// This is all to reset the volume after
+	// the last track in the playlist gets cut off
+	if (m_volume > 0 
+		SUCCEEDED(m_spPlayer->QueryInterface(&pCore)) &&
+		SUCCEEDED(pCore->get_settings(&pSettings))) {
+		OutputDebugString(L"Resetting volume\n");
+		pSettings->put_volume(m_volume);
+		m_volume = 0;
+	}
+	return 1;
+}
+
+LRESULT CMainDialog::OnSysCommand(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled) {
+	if (wParam == IDM_SYSCOMMAND_SETTINGS) {
+		bHandled = TRUE;
+		CSettingsDialog dlg(m_countdownSetting, m_fadeoutSetting);
+		dlg.DoModal();
+		if (dlg.m_countdown != m_countdownSetting || dlg.m_fadeout != m_fadeoutSetting) {
+			m_countdownSetting = dlg.m_countdown;
+			m_fadeoutSetting = dlg.m_fadeout;
+			// store in registry here
+		}
+		return 0;
+	}
+	bHandled = FALSE;
+	return 1;
+}
+
+void STDMETHODCALLTYPE CMainDialog::PlayStateChange(
+	/* [in] */ long NewState) {
+	CString out;
+	out.Format(L"PlayStateChange %d\n", NewState);
+	OutputDebugString(out);
+	switch (NewState) {
+	case wmppsMediaEnded:
+		m_doDelay = TRUE;
+		break;
+	case wmppsPlaying:
+		if (m_doDelay) {
+			m_doDelay = FALSE;
+			if (m_countdownSetting > 0) {
+				PostMessage(WM_COUNTDOWNSTART);
+				m_transitionTime = m_countdownSetting;
+				PostMessage(WM_TIMER, IDT_SECOND_TIMER);
+			}
+		}
+		break;
+	case wmppsReady:
+		// assume the playlist ended
+		PostMessage(WM_COUNTDOWNEND);
+		break;
+	}
+}
+
+void STDMETHODCALLTYPE CMainDialog::MediaChange(
+	/* [in] */ IDispatch* Item) {
+	OutputDebugString(L"MediaChange\n");
+}
+
 void CMainDialog::CheckCountdown() {
 	CString text;
 	CComPtr<IWMPCore> pCore;
 	CComPtr<IWMPControls> pControl;
+	CComPtr<IWMPSettings> pSettings;
 	CComPtr<IWMPMedia> pCurrentItem;
 
 	if (SUCCEEDED(m_spPlayer->QueryInterface(&pCore))){
-		if (SUCCEEDED(pCore->get_controls(&pControl))){
-			if (m_transitionTime == TRANSITION_DELAY_SECS){
+		if (SUCCEEDED(pCore->get_controls(&pControl)) &&
+			SUCCEEDED(pCore->get_settings(&pSettings))){
+			if (m_transitionTime == m_countdownSetting && m_countdownSetting > 0){
 				// Start of transition delay
 				OutputDebugString(L"CheckCountdown: Start of transition delay\n");
-				pControl->stop();
 			}
 			if (m_transitionTime > 0){
 				if (m_transitionTime == 1){
 					// End of transition delay
 					OutputDebugString(L"CheckCountdown: End of transition delay\n");
+					if (m_volume > 0)
+						pSettings->put_volume(m_volume);
 					pControl->play();
 				}
 				else {
@@ -319,22 +403,44 @@ void CMainDialog::CheckCountdown() {
 					out.Format(L"CheckCountdown: transitioning %d\n", m_transitionTime);
 					OutputDebugString(out);
 					text.Format(L"%d", (int)m_transitionTime);
+
 				}
 				m_transitionTime--;
 			}
 			else if (SUCCEEDED(pControl->get_currentItem(&pCurrentItem))) {
 				double currentPosition = 0;
-				double duration = 0;
+				double trackLength = 0;
 				if (pControl && pCurrentItem &&
 					SUCCEEDED(pControl->get_currentPosition(&currentPosition)) &&
-					SUCCEEDED(pCurrentItem->get_duration(&duration))) {
+					SUCCEEDED(pCurrentItem->get_duration(&trackLength))) {
+					double duration = trackLength;
+					if (m_fadeoutSetting > 0 && duration > m_fadeoutSetting)
+						duration = m_fadeoutSetting;
 
 					CString minutes;
-					m_timeLeft = (duration - currentPosition);
-					if (m_timeLeft >= 60)
-						minutes.Format(L"%d:", (int)m_timeLeft / 60);
-					text.Format(L"%s%02d", minutes.GetBuffer(), (int)m_timeLeft % 60);
+					int timeLeft = int(duration - currentPosition);
+					if (timeLeft >= 60)
+						minutes.Format(L"%d:", timeLeft / 60);
+					text.Format(L"%s%02d", minutes.GetBuffer(), timeLeft % 60);
 					OutputDebugString(CString(L"CheckCountdown: ") + text + L"\n");
+
+					if (m_fadeoutSetting > 0 && timeLeft == FADEOUT_SECS) {
+						if (!SUCCEEDED(pSettings->get_volume(&m_volume)))
+							m_volume = 0;
+					}
+					else if (m_fadeoutSetting > 0 && timeLeft < FADEOUT_SECS) {
+						if (m_volume > 0) {
+							OutputDebugString(L"Lowering volume\n");
+							pSettings->put_volume(m_volume * timeLeft / FADEOUT_SECS);
+						}
+						// Here's where we cut off the end
+						if (timeLeft <= 0 && m_fadeoutSetting > 0 && trackLength > m_fadeoutSetting) {
+							CString out;
+							out.Format(L"Cutting off %d length track\n", int(trackLength));
+							OutputDebugString(out);
+							pControl->put_currentPosition(trackLength);
+						}
+					}
 				}
 			}
 		}

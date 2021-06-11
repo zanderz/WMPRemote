@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "WMPRemote"
-#define MyAppVersion "1.5"
+#define MyAppVersion "1.5.0.2"
 #define MyAppPublisher "Me"
 #define MyAppURL "https://github.com/zanderz/WMPRemote"
 #define MyAppExeName "WMPRemote.exe"
