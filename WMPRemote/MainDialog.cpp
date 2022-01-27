@@ -135,16 +135,11 @@ LRESULT CMainDialog::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL&
 
 // Start the timer on which we reset the strings
 void CMainDialog::RefreshPlayList(){
-	SetTimer(IDT_TIMER1, 500, NULL);
+	PostMessage(WM_DRAWPLAYLIST);
 }
 
 LRESULT CMainDialog::OnTimer(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled){
-	if (wParam == IDT_TIMER1){
-		SetPlayList();
-		KillTimer(IDT_TIMER1);
-		return 0;
-	}
-	else if (wParam == IDT_SECOND_TIMER){
+	if (wParam == IDT_SECOND_TIMER){
 		CheckCountdown();
 	}
 	return 1;
@@ -194,14 +189,7 @@ void CMainDialog::SetPlayList()
 
 			if (FAILED(pItem->get_attributeCount(&lAttributeCount)))
 				continue;
-			//for (int j = 0; j < lAttributeCount; j++)
-			//{
-			//	if (FAILED(pItem->getAttributeName(j, &attributeName)))
-			//		continue;
-			//	pItem->getItemInfo(attributeName, &attributeVal);
-			//	int i = 0;
-			//}
-			//attributeVal.Empty();
+
 			if (FAILED(pItem->getItemInfo(CComBSTR(L"WM/Genre"), &attributeVal)) || attributeVal.Length() == 0)
 			{
 				pItem->getItemInfo(L"Title", &attributeVal);
@@ -311,6 +299,8 @@ LRESULT CMainDialog::OnCountdownStart(UINT uMsg, WPARAM wParam, LPARAM lParam, B
 			pControl->stop();
 		}
 	}
+	// In case we stopped it by cutting off the track
+	SetTimer(IDT_SECOND_TIMER, 1000, NULL);
 	return 1;
 }
 
@@ -326,6 +316,12 @@ LRESULT CMainDialog::OnCountdownEnd(UINT uMsg, WPARAM wParam, LPARAM lParam, BOO
 		pSettings->put_volume(m_volume);
 		m_volume = 0;
 	}
+	return 1;
+}
+
+LRESULT CMainDialog::OnDrawPlaylist(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled) {
+	SetPlayList();
+	bHandled = TRUE;
 	return 1;
 }
 
@@ -360,7 +356,7 @@ void STDMETHODCALLTYPE CMainDialog::PlayStateChange(
 			if (m_countdownSetting > 0) {
 				PostMessage(WM_COUNTDOWNSTART);
 				m_transitionTime = m_countdownSetting;
-				PostMessage(WM_TIMER, IDT_SECOND_TIMER);
+				//PostMessage(WM_TIMER, IDT_SECOND_TIMER);
 			}
 		}
 		break;
@@ -438,6 +434,7 @@ void CMainDialog::CheckCountdown() {
 							CString out;
 							out.Format(L"Cutting off %d length track\n", int(trackLength));
 							OutputDebugString(out);
+							KillTimer(IDT_SECOND_TIMER);
 							pControl->put_currentPosition(trackLength);
 						}
 					}

@@ -7,7 +7,6 @@
 #include <atlhost.h>
 #include "wmp.h"
 
-#define IDT_TIMER1	111
 #define IDT_SECOND_TIMER 	112
 #define TRANSITION_DELAY_SECS 10
 #define FADEOUT_SECS 5				// cut off track by lowering the volume over this period
@@ -15,6 +14,7 @@
 
 #define WM_COUNTDOWNSTART	WM_USER+100
 #define WM_COUNTDOWNEND		WM_USER+101
+#define WM_DRAWPLAYLIST		WM_USER+102
 
 #define IDM_SYSCOMMAND_SETTINGS		0xE000
 
@@ -68,6 +68,7 @@ BEGIN_MSG_MAP(CMainDialog)
 	MESSAGE_HANDLER(WM_WINDOWPOSCHANGED, OnWindowPosChanged)
 	MESSAGE_HANDLER(WM_COUNTDOWNSTART, OnCountdownStart)
 	MESSAGE_HANDLER(WM_COUNTDOWNEND, OnCountdownEnd)
+	MESSAGE_HANDLER(WM_DRAWPLAYLIST, OnDrawPlaylist)
 	MESSAGE_HANDLER(WM_SYSCOMMAND, OnSysCommand)
 	COMMAND_HANDLER(IDOK, BN_CLICKED, OnClickedOK)
 	COMMAND_HANDLER(IDCANCEL, BN_CLICKED, OnClickedCancel)
@@ -85,6 +86,7 @@ END_MSG_MAP()
 	LRESULT OnWindowPosChanged(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	LRESULT OnCountdownStart(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	LRESULT OnCountdownEnd(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
+	LRESULT OnDrawPlaylist(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	LRESULT OnSysCommand(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	
 	void RefreshPlayList();
@@ -175,7 +177,7 @@ END_MSG_MAP()
 	void STDMETHODCALLTYPE CurrentPlaylistChange(
 		/* [in] */ WMPPlaylistChangeEventType change){
 		CString out;
-		out.Format(L"PlaylistChange %d\n", change);
+		out.Format(L"CurrentPlaylistChange %d\n", change);
 		OutputDebugString(out);
 		RefreshPlayList();
 		}
