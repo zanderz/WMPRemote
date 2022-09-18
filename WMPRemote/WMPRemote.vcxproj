@@ -135,6 +135,7 @@
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="WMPRemote_i.h" />
+    <ClInclude Include="WMPVersion.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="WMPRemote.rc" />
